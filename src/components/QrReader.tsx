@@ -11,27 +11,43 @@ const QrReader: React.FC = () => {
 	const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
 	useEffect(() => {
-		const startScanner = async () => {
+		const fetchDevices = async () => {
 			try {
 				const codeReader = new BrowserMultiFormatReader();
 				readerRef.current = codeReader;
 
-				// カメラデバイスを取得
-				const videoInputDevices = await codeReader.getVideoInputDevices();
-				setVideoInputDevices(videoInputDevices);
+				const devices = await codeReader.getVideoInputDevices();
+				setVideoInputDevices(devices);
 
-				if (videoInputDevices.length === 0) {
-					console.error("No video input devices found.");
-					return;
-				}
+				// デフォルトで背面カメラを選択 (ない場合は最初のカメラ)
+				const backCamera = devices.find((device) =>
+					device.label.toLowerCase().includes("back"),
+				);
+				setSelectedDeviceId(
+					backCamera?.deviceId || devices[0]?.deviceId || null,
+				);
+			} catch (error) {
+				console.error("Error fetching video input devices:", error);
+			}
+		};
 
-				// 初めのカメラデバイスを選択
-				setSelectedDeviceId(videoInputDevices[0].deviceId);
+		fetchDevices();
+	}, []);
 
-				if (videoRef.current) {
+	useEffect(() => {
+		const startScanner = async () => {
+			if (!selectedDeviceId || !videoRef.current) return;
+
+			try {
+				const codeReader = readerRef.current;
+
+				if (codeReader) {
+					// 既存のスキャンをリセット
+					codeReader.reset();
+
 					// QRコードを連続して読み取る
 					codeReader.decodeFromVideoDevice(
-						videoInputDevices[0].deviceId,
+						selectedDeviceId,
 						videoRef.current,
 						(result, err) => {
 							if (result) {
@@ -57,7 +73,7 @@ const QrReader: React.FC = () => {
 				readerRef.current.reset();
 			}
 		};
-	}, []);
+	}, [selectedDeviceId]);
 
 	return (
 		<div>
