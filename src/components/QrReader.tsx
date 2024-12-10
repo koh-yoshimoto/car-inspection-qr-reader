@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/library";
+import { BrowserMultiFormatReader, VideoInputDevice } from "@zxing/library";
 
 const QrReader: React.FC = () => {
 	const [qrCodeValue, setQrCodeValue] = useState<string | null>(null);
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+	const [videoInputDevices, setVideoInputDevices] = useState<
+		VideoInputDevice[]
+	>([]);
+	const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
 	useEffect(() => {
 		const startScanner = async () => {
@@ -13,7 +17,8 @@ const QrReader: React.FC = () => {
 				readerRef.current = codeReader;
 
 				// カメラデバイスを取得
-				const videoInputDevices = await codeReader.listVideoInputDevices();
+				const videoInputDevices = await codeReader.getVideoInputDevices();
+				setVideoInputDevices(videoInputDevices);
 
 				if (videoInputDevices.length === 0) {
 					console.error("No video input devices found.");
@@ -21,12 +26,12 @@ const QrReader: React.FC = () => {
 				}
 
 				// 初めのカメラデバイスを選択
-				const firstDeviceId = videoInputDevices[0].deviceId;
+				setSelectedDeviceId(videoInputDevices[0].deviceId);
 
 				if (videoRef.current) {
 					// QRコードを連続して読み取る
 					codeReader.decodeFromVideoDevice(
-						firstDeviceId,
+						videoInputDevices[0].deviceId,
 						videoRef.current,
 						(result, err) => {
 							if (result) {
@@ -57,6 +62,17 @@ const QrReader: React.FC = () => {
 	return (
 		<div>
 			<h1>QR Code Reader</h1>
+			<select
+				id="cameraSelect"
+				value={selectedDeviceId || ""}
+				onChange={(e) => setSelectedDeviceId(e.target.value)}
+			>
+				{videoInputDevices.map((device) => (
+					<option key={device.deviceId} value={device.deviceId}>
+						{device.label || `Camera ${device.deviceId}`}
+					</option>
+				))}
+			</select>
 			<video
 				ref={videoRef}
 				style={{ width: "100%", border: "1px solid black" }}
