@@ -1,98 +1,129 @@
 import React, { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, VideoInputDevice } from "@zxing/library";
+import {
+	BrowserQRCodeReader,
+	VideoInputDevice,
+	NotFoundException,
+	ChecksumException,
+	FormatException,
+} from "@zxing/library";
 
 const QrReader: React.FC = () => {
-	const [qrCodeValue, setQrCodeValue] = useState<string | null>(null);
+	const [qrCodeValue, setQrCodeValue] = useState<string>("");
 	const videoRef = useRef<HTMLVideoElement | null>(null);
-	const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+	const [scanning, setScanning] = useState(false);
 	const [videoInputDevices, setVideoInputDevices] = useState<
 		VideoInputDevice[]
 	>([]);
-	const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+	const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(
+		undefined,
+	);
+
+	const codeReader = new BrowserQRCodeReader();
 
 	useEffect(() => {
-		const fetchDevices = async () => {
-			try {
-				const codeReader = new BrowserMultiFormatReader();
-				readerRef.current = codeReader;
-
-				const devices = await codeReader.getVideoInputDevices();
-				setVideoInputDevices(devices);
-
-				// デフォルトで背面カメラを選択 (ない場合は最初のカメラ)
-				const backCamera = devices.find((device) =>
-					device.label.toLowerCase().includes("back"),
-				);
-				setSelectedDeviceId(
-					backCamera?.deviceId || devices[0]?.deviceId || null,
-				);
-			} catch (error) {
+		codeReader
+			.getVideoInputDevices()
+			.then((devices) => {
+				setupDevices(devices);
+				devices.forEach((device) => {
+					console.log(
+						"videoInputDevices",
+						device.label,
+						device.deviceId,
+						device.kind,
+						device.groupId,
+					);
+				});
+				startScan();
+			})
+			.catch((error) => {
 				console.error("Error fetching video input devices:", error);
-			}
-		};
-
-		fetchDevices();
+			});
 	}, []);
 
-	useEffect(() => {
-		const startScanner = async () => {
-			if (!selectedDeviceId || !videoRef.current) return;
+	const setupDevices = (videoInputDevices: VideoInputDevice[]): void => {
+		// selects first device
+		setSelectedDeviceId(undefined);
 
-			try {
-				const codeReader = readerRef.current;
+		// setup devices dropdown
+		if (videoInputDevices.length >= 1) {
+			setVideoInputDevices(videoInputDevices);
+		}
+	};
 
-				if (codeReader) {
-					// 既存のスキャンをリセット
-					codeReader.reset();
+	const startScan = () => {
+		if (!videoRef.current) return;
 
-					// QRコードを連続して読み取る
-					codeReader.decodeFromVideoDevice(
-						selectedDeviceId,
-						videoRef.current,
-						(result, err) => {
-							if (result) {
-								setQrCodeValue(result.getText());
-								console.log("QR Code scanned:", result.getText());
-							}
-							if (err && !(err.name === "NotFoundException")) {
-								console.error(err);
-							}
-						},
-					);
+		setScanning(true);
+		console.log(selectedDeviceId);
+		codeReader.decodeFromInputVideoDeviceContinuously(
+			selectedDeviceId as any,
+			"video",
+			(result, err) => {
+				if (result) {
+					console.log("QR Code Found:", result.getText());
+					setQrCodeValue(result.getText());
 				}
-			} catch (error) {
-				console.error("Error starting QR scanner:", error);
-			}
-		};
+				if (err) {
+					// As long as this error belongs into one of the following categories
+					// the code reader is going to continue as excepted. Any other error
+					// will stop the decoding loop.
+					//
+					// Excepted Exceptions:
+					//
+					//  - NotFoundException
+					//  - ChecksumException
+					//  - FormatException
+					if (err instanceof NotFoundException) {
+						console.log("No QR code found.");
+					}
+					if (err instanceof ChecksumException) {
+						console.log("A code was found, but it's read value was not valid.");
+					}
+					if (err instanceof FormatException) {
+						console.log("A code was found, but it was in a invalid format.");
+					}
+				}
+			},
+		);
+	};
 
-		startScanner();
-
-		return () => {
-			// クリーンアップ処理
-			if (readerRef.current) {
-				readerRef.current.reset();
-			}
-		};
-	}, [selectedDeviceId]);
+	const stopScan = () => {
+		codeReader.reset();
+		setScanning(false);
+		if (qrCodeValue) {
+			setQrCodeValue("");
+		}
+	};
 
 	return (
 		<div>
 			<h1>QR Code Reader</h1>
-			<select
-				id="cameraSelect"
-				value={selectedDeviceId || ""}
-				onChange={(e) => setSelectedDeviceId(e.target.value)}
-			>
-				{videoInputDevices.map((device) => (
-					<option key={device.deviceId} value={device.deviceId}>
-						{device.label || `Camera ${device.deviceId}`}
-					</option>
-				))}
-			</select>
-			<video
-				ref={videoRef}
-				style={{ width: "100%", border: "1px solid black" }}
-			/>
+
+			<div id="sourceSelectPanel">
+				<label htmlFor="sourceSelect">Change video source:</label>
+				<select
+					id="sourceSelect"
+					onChange={(e) => setSelectedDeviceId(e.target.value)}
+				>
+					{videoInputDevices.map((element) => (
+						<option value={element.deviceId}>
+							{element.label}:{element.groupId}:{element.kind}:
+							{element.deviceId}
+						</option>
+					))}
+				</select>
+			</div>
+
+			<div style={{ margin: "20px 0" }}>
+				<button onClick={startScan} disabled={scanning}>
+					Start
+				</button>
+				<button onClick={stopScan} disabled={!scanning}>
+					Stop
+				</button>
+			</div>
+			<video ref={videoRef} id="video" width="300" height="200"></video>
 			<p>Scanned QR Code: {qrCodeValue ?? "No code scanned yet"}</p>
 		</div>
 	);
