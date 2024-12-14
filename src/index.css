@@ -94,6 +94,7 @@ li {
 
 .square-container {
   display: flex;
+  justify-content: center;
   gap: 1rem;
   flex-direction: row;
   margin: 2rem 0;

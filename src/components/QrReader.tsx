@@ -29,9 +29,7 @@ const QrReader: React.FC = () => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         //play video if video does not starts
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-        };
+        videoRef.current?.play();
       }
 
       const offscreenCanvas = new OffscreenCanvas(width, height);
