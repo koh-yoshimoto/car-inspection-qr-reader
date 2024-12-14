@@ -1,132 +1,140 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-	BrowserQRCodeReader,
-	VideoInputDevice,
-	NotFoundException,
-	ChecksumException,
-	FormatException,
-} from "@zxing/library";
+import { readBarcodesFromImageData } from "zxing-wasm/reader";
+import detectQrCodeIndex from "./../lib/analyzer";
 
 const QrReader: React.FC = () => {
-	const [qrCodeValue, setQrCodeValue] = useState<string>("");
-	const videoRef = useRef<HTMLVideoElement | null>(null);
-	const [scanning, setScanning] = useState(false);
-	const [videoInputDevices, setVideoInputDevices] = useState<
-		VideoInputDevice[]
-	>([]);
-	const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(
-		undefined,
-	);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [results, setResults] = useState<string[]>(["", "", "", "", ""]);
+  const [carType, setCarType] = useState<string>("");
 
-	const codeReader = new BrowserQRCodeReader();
+  //NOTE: Config
+  const width = 1000;
+  const height = 1000;
+  const frameSkipInterval = 3;
 
-	useEffect(() => {
-		codeReader
-			.getVideoInputDevices()
-			.then((devices) => {
-				setupDevices(devices);
-				devices.forEach((device) => {
-					console.log(
-						"videoInputDevices",
-						device.label,
-						device.deviceId,
-						device.kind,
-						device.groupId,
-					);
-				});
-				startScan();
-			})
-			.catch((error) => {
-				console.error("Error fetching video input devices:", error);
-			});
-	}, []);
+  useEffect(() => {
+    let animationFrameId: number;
+    let stream: MediaStream | null = null;
+    let frameSkipCounter = 0;
 
-	const setupDevices = (videoInputDevices: VideoInputDevice[]): void => {
-		// selects first device
-		setSelectedDeviceId(undefined);
+    const startScanner = async () => {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
 
-		// setup devices dropdown
-		if (videoInputDevices.length >= 1) {
-			setVideoInputDevices(videoInputDevices);
-		}
-	};
+      console.log("Active stream:", stream);
 
-	const startScan = () => {
-		if (!videoRef.current) return;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        //play video if video does not starts
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+        };
+      }
 
-		setScanning(true);
-		console.log(selectedDeviceId);
-		codeReader.decodeFromInputVideoDeviceContinuously(
-			selectedDeviceId as any,
-			"video",
-			(result, err) => {
-				if (result) {
-					console.log("QR Code Found:", result.getText());
-					setQrCodeValue(result.getText());
-				}
-				if (err) {
-					// As long as this error belongs into one of the following categories
-					// the code reader is going to continue as excepted. Any other error
-					// will stop the decoding loop.
-					//
-					// Excepted Exceptions:
-					//
-					//  - NotFoundException
-					//  - ChecksumException
-					//  - FormatException
-					if (err instanceof NotFoundException) {
-						console.log("No QR code found.");
-					}
-					if (err instanceof ChecksumException) {
-						console.log("A code was found, but it's read value was not valid.");
-					}
-					if (err instanceof FormatException) {
-						console.log("A code was found, but it was in a invalid format.");
-					}
-				}
-			},
-		);
-	};
+      const offscreenCanvas = new OffscreenCanvas(width, height);
+      const context = offscreenCanvas.getContext("2d");
+      if (!context) return;
 
-	const stopScan = () => {
-		codeReader.reset();
-		setScanning(false);
-		if (qrCodeValue) {
-			setQrCodeValue("");
-		}
-	};
+      const scanFrame = async () => {
+        if (!videoRef.current) {
+          console.log("videoRef is not ready");
+          return;
+        }
 
-	return (
-		<div>
-			<h1>QR Code Reader</h1>
+        frameSkipCounter++;
+        if (frameSkipCounter % frameSkipInterval !== 0) {
+          animationFrameId = requestAnimationFrame(scanFrame);
+          return;
+        }
 
-			<div id="sourceSelectPanel">
-				<label htmlFor="sourceSelect">Change video source:</label>
-				<select
-					id="sourceSelect"
-					onChange={(e) => setSelectedDeviceId(e.target.value)}
-				>
-					{videoInputDevices.map((element) => (
-						<option value={element.deviceId}>
-							{element.label}:{element.groupId}:{element.kind}:
-							{element.deviceId}
-						</option>
-					))}
-				</select>
-			</div>
+        context.drawImage(videoRef.current, 0, 0, width, height);
 
-			<div style={{ margin: "20px 0" }}>
-				<button onClick={startScan} disabled={scanning}>
-					Start
-				</button>
-				<button onClick={stopScan} disabled={!scanning}>
-					Stop
-				</button>
-			</div>
-			<video ref={videoRef} id="video" width="300" height="200"></video>
-			<p>Scanned QR Code: {qrCodeValue ?? "No code scanned yet"}</p>
-		</div>
-	);
+        const imageData = context.getImageData(0, 0, width, height);
+
+        try {
+          const readResults = await readBarcodesFromImageData(imageData, {
+            formats: ["QRCode"],
+          });
+          if (!readResults) {
+            console.log("No result");
+          }
+
+          readResults.forEach((e) => {
+            if (e.text) {
+              const index = detectQrCodeIndex(e);
+              if (index != -1) {
+                setResults((prev) => {
+                  const newResults = [...prev];
+                  newResults[index] = e.text;
+                  return newResults;
+                });
+              }
+            }
+          });
+        } catch (e) {
+          console.error("Error occurred while reading qrcode", e);
+        }
+
+        animationFrameId = requestAnimationFrame(scanFrame);
+      };
+
+      scanFrame();
+    };
+
+    startScanner();
+
+    return () => {
+      // クリーンアップ
+
+      if (videoRef.current) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      }
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (results[0] && results[1] && results[2] && results[3] && results[4]) {
+      videoRef.current?.pause();
+      setIsCompleted(true);
+
+      // const qr2 = results[3] + results[4];
+      const qr3 = results[0] + results[1] + results[2];
+      setCarType(qr3.split("/")[5]);
+    }
+  }, [results]);
+
+  return (
+    <>
+      <video ref={videoRef} style={{ width: "100%", height: "50%" }} />
+
+      <div style={!isCompleted ? {} : { color: "green" }}>
+        {!isCompleted
+          ? "📹 QRコードをスキャンしてください"
+          : "✅ QRコードのスキャンが完了しました"}
+      </div>
+
+      <div className="square-container">
+        {results.map((result, index) => (
+          <div
+            key={index}
+            className="square"
+            style={result === "" ? {} : { backgroundColor: "#4caf50" }}
+          ></div>
+        ))}
+      </div>
+      <div className="info-container">
+        <h3>車両情報</h3>
+        <div> 型式:{carType} </div>
+      </div>
+    </>
+  );
 };
 
 export default QrReader;
