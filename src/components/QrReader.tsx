@@ -20,7 +20,7 @@ const QrReader: React.FC = () => {
 
     const startScanner = async () => {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { width: 1280, height: 720, facingMode: "environment" },
         audio: false,
       });
 
@@ -28,8 +28,16 @@ const QrReader: React.FC = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        //play video if video does not starts
-        videoRef.current?.play();
+
+        // カメラが準備完了するのを待つ
+        await new Promise<void>((resolve) => {
+          videoRef.current!.onloadedmetadata = () => {
+            resolve();
+          };
+        });
+
+        // 準備ができたら再生
+        await videoRef.current.play();
       }
 
       const offscreenCanvas = new OffscreenCanvas(width, height);
@@ -110,7 +118,13 @@ const QrReader: React.FC = () => {
 
   return (
     <>
-      <video ref={videoRef} style={{ width: "100%", height: "50%" }} />
+      <video
+        ref={videoRef}
+        style={{ width: "100%", height: "50%" }}
+        muted
+        autoPlay
+        playsInline
+      />
 
       <div style={!isCompleted ? {} : { color: "green" }}>
         {!isCompleted
