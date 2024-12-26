@@ -4,6 +4,7 @@ import detectQrCodeIndex from "./../lib/analyzer";
 
 const QrReader: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const guideCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [results, setResults] = useState<string[]>(["", "", "", "", ""]);
   const [carType, setCarType] = useState<string>("");
@@ -51,22 +52,28 @@ const QrReader: React.FC = () => {
         "canvas",
       ) as HTMLCanvasElement;
 
-      const canvasElement = guideCanvas;
-      canvasElement.width = videoRef.current?.videoWidth ?? 0;
-      canvasElement.height = videoRef.current?.videoHeight ?? 0;
+      // assign canvasRef
+      guideCanvasRef.current = guideCanvas;
+
+      guideCanvasRef.current.width = videoRef.current?.videoWidth ?? 0;
+      guideCanvasRef.current.height = videoRef.current?.videoHeight ?? 0;
 
       const drawGuide = (result: ReadResult) => {
-        const context = canvasElement.getContext("2d");
+        if (!guideCanvasRef.current) return;
+
+        const context = guideCanvasRef.current.getContext("2d");
         if (!context) return;
 
         setTimeout(() => {
-          context.clearRect(0, 0, canvasElement.width, canvasElement.height);
+          context.clearRect(
+            0,
+            0,
+            guideCanvasRef.current?.width ?? 0,
+            guideCanvasRef.current?.height ?? 0,
+          );
         }, 50);
 
         const pos = result.position; // QRコードの頂点情報を取得
-
-        console.log("pos", pos);
-        console.log(canvasElement.width, canvasElement.height);
 
         context.beginPath();
         context.moveTo(pos.bottomLeft.x, pos.bottomLeft.y);
@@ -133,15 +140,15 @@ const QrReader: React.FC = () => {
     return () => {
       if (videoRef.current) {
         // clear canvas
-        const guideCanvas = document.getElementById(
-          "canvas",
-        ) as HTMLCanvasElement;
-        const canvasElement = guideCanvas;
-        canvasElement.width = videoRef.current?.videoWidth ?? 0;
-        canvasElement.height = videoRef.current?.videoHeight ?? 0;
-        const context = canvasElement.getContext("2d");
+        if (!guideCanvasRef.current) return;
+        const context = guideCanvasRef.current.getContext("2d");
         if (context) {
-          context.clearRect(0, 0, canvasElement.width, canvasElement.height);
+          context.clearRect(
+            0,
+            0,
+            guideCanvasRef.current?.width ?? 0,
+            guideCanvasRef.current?.height ?? 0,
+          );
         }
 
         //close camera
@@ -170,15 +177,15 @@ const QrReader: React.FC = () => {
       console.log("qr3", qr3);
 
       // clear canvas
-      const guideCanvas = document.getElementById(
-        "canvas",
-      ) as HTMLCanvasElement;
-      const canvasElement = guideCanvas;
-      canvasElement.width = videoRef.current?.videoWidth ?? 0;
-      canvasElement.height = videoRef.current?.videoHeight ?? 0;
-      const context = canvasElement.getContext("2d");
+      if (!guideCanvasRef.current) return;
+      const context = guideCanvasRef.current.getContext("2d");
       if (context) {
-        context.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        context.clearRect(
+          0,
+          0,
+          guideCanvasRef.current?.width ?? 0,
+          guideCanvasRef.current?.height ?? 0,
+        );
       }
     }
   }, [results]);
