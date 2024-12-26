@@ -4,11 +4,12 @@ const is4thQr = (text: string) => {
   return text.split("/").length == 2 && text.split("/")[0] == "2";
 };
 
-const is5thQr = (text: string) => {
-  //全角チェックの正規表現
-  const zenkakuNum = /^[\uFF10-\uFF19]$/;
-  return text.split("/").length == 5 && zenkakuNum.test(text.split("/")[0]);
-};
+// NOTE: チェックすると読み取られないケースがあったのでコメントアウト
+// const is5thQr = (text: string) => {
+//   //全角チェックの正規表現
+//   const zenkakuNum = /^[\uFF10-\uFF19]$/;
+//	 return text.split("/").length == 5 && zenkakuNum.test(text.split("/")[0]);
+// };
 
 const detectQrCodeIndex = (readResult: ReadResult) => {
   if (!readResult.isValid) {
@@ -27,11 +28,7 @@ const detectQrCodeIndex = (readResult: ReadResult) => {
     is4thQr(readResult.text)
   ) {
     return 3;
-  } else if (
-    readResult.sequenceSize == 2 &&
-    readResult.sequenceIndex == 1 &&
-    is5thQr(readResult.text)
-  ) {
+  } else if (readResult.sequenceSize == 2 && readResult.sequenceIndex == 1) {
     return 4;
   } else {
     console.log("not QR code for car inspection");
