@@ -13,18 +13,19 @@ const QrReader: React.FC = () => {
   const [primeMoverType, setPrimeMoverType] = useState<string>("");
 
   //NOTE: Config
-  const width = 1000;
-  const height = 1000;
+  const width = 1500;
+  const height = 1500;
   const frameSkipInterval = 3;
 
   useEffect(() => {
+    if (isCompleted) return;
     let animationFrameId: number;
     let stream: MediaStream | null = null;
     let frameSkipCounter = 0;
 
     const startScanner = async () => {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1000, height: 1000, facingMode: "environment" },
+        video: { width: 1500, height: 1500, facingMode: "environment" },
         audio: false,
       });
 
@@ -160,7 +161,7 @@ const QrReader: React.FC = () => {
 
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [isCompleted]);
 
   useEffect(() => {
     if (results[0] && results[1] && results[2] && results[3] && results[4]) {
