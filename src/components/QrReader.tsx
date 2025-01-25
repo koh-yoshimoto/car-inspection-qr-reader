@@ -212,8 +212,8 @@ const QrReader: React.FC = () => {
         />
         <canvas id="canvas" className="overlay-canvas"></canvas>
       </div>
-      <button onClick={() => setZoom((prev) => prev + 0.5)}>Zoom In</button>
-      <button onClick={() => setZoom((prev) => prev - 0.5)}>Zoom Out</button>
+      <button onClick={() => setZoom((prev) => prev + 0.5)}> + </button>
+      <button onClick={() => setZoom((prev) => prev - 0.5)}> - </button>
 
       <div style={!isCompleted ? {} : { color: "green" }}>
         {!isCompleted
@@ -271,7 +271,7 @@ const QrReader: React.FC = () => {
 
       <div>ズーム倍率: {zoom}</div>
       <div onClick={() => setShowSetting(!showSetting)}>
-        See Camera Settings
+        Confirm Camera Settings
       </div>
       {showSetting && (
         <textarea
@@ -282,7 +282,7 @@ const QrReader: React.FC = () => {
       )}
 
       <div onClick={() => setShowCapabilities(!showCapabilities)}>
-        See Camera Capabilities
+        Confirm Camera Capabilities
       </div>
       {showCapabilities && (
         <textarea
