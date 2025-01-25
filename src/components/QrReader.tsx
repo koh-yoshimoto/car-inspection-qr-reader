@@ -1,16 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
 import { readBarcodesFromImageData, ReadResult } from "zxing-wasm/reader";
-import detectQrCodeIndex from "./../lib/analyzer";
+import useAnalyzer from "./../lib/hooks/useAnalyzer";
 
 const QrReader: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const guideCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [isCompleted, setIsCompleted] = useState<boolean>(false);
-  const [results, setResults] = useState<string[]>(["", "", "", "", ""]);
-  const [carType, setCarType] = useState<string>("");
-  const [carNumber, setCarNumber] = useState<string>("");
-  const [serialNumber, setSerialNumber] = useState<string>("");
-  const [primeMoverType, setPrimeMoverType] = useState<string>("");
+  const [setting, setSetting] = useState<string>("");
+  const [capabilities, setCapabilities] = useState<string>("");
+  const [showSetting, setShowSetting] = useState<boolean>(false);
+  const [showCapabilities, setShowCapabilities] = useState<boolean>(false);
+  const [zoom, setZoom] = useState<number>(1);
+
+  const {
+    addReadResult,
+    readResults,
+    vehicleDetails,
+    isLightVehicle,
+    isCompleted,
+  } = useAnalyzer();
 
   //NOTE: Config
   const width = 1500;
@@ -30,6 +37,18 @@ const QrReader: React.FC = () => {
       });
 
       console.log("Active stream:", stream);
+
+      console.log(
+        "supported constraints",
+        navigator.mediaDevices.getSupportedConstraints(),
+      );
+
+      const videoTracks = stream.getVideoTracks();
+      console.log("videoTracks", videoTracks);
+      console.log("capabilities", videoTracks[0].getCapabilities());
+      console.log("settings", videoTracks[0].getSettings());
+      setSetting(JSON.stringify(videoTracks[0].getSettings()));
+      setCapabilities(JSON.stringify(videoTracks[0].getCapabilities()));
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -116,14 +135,7 @@ const QrReader: React.FC = () => {
           readResults.forEach((e: ReadResult) => {
             drawGuide(e);
             if (e.text) {
-              const index = detectQrCodeIndex(e);
-              if (index != -1) {
-                setResults((prev) => {
-                  const newResults = [...prev];
-                  newResults[index] = e.text;
-                  return newResults;
-                });
-              }
+              addReadResult(e);
             }
           });
         } catch (e) {
@@ -163,33 +175,30 @@ const QrReader: React.FC = () => {
     };
   }, [isCompleted]);
 
+  const formatJson = (json: string): string => {
+    return JSON.stringify(JSON.parse(json), null, 2);
+  };
+
   useEffect(() => {
-    if (results[0] && results[1] && results[2] && results[3] && results[4]) {
-      videoRef.current?.pause();
-      setIsCompleted(true);
-
-      const qr2 = results[3] + results[4];
-      const qr3 = results[0] + results[1] + results[2];
-      setCarType(qr3.split("/")[5]);
-      setCarNumber(qr2.split("/")[1].replace(/\s+/g, ""));
-      setSerialNumber(qr2.split("/")[3].replace(/\s+/g, ""));
-      setPrimeMoverType(qr2.split("/")[4].replace(/\s+/g, ""));
-      console.log("qr2", qr2);
-      console.log("qr3", qr3);
-
-      // clear canvas
-      if (!guideCanvasRef.current) return;
-      const context = guideCanvasRef.current.getContext("2d");
-      if (context) {
-        context.clearRect(
-          0,
-          0,
-          guideCanvasRef.current?.width ?? 0,
-          guideCanvasRef.current?.height ?? 0,
-        );
+    if (videoRef.current) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const track = stream?.getVideoTracks()[0];
+      if (track && track.applyConstraints) {
+        try {
+          track.applyConstraints({
+            advanced: [
+              {
+                zoom: zoom,
+              },
+            ],
+          } as unknown as MediaTrackConstraints);
+        } catch (e) {
+          alert("ズーム機能に対応していません。");
+          console.log(e);
+        }
       }
     }
-  }, [results]);
+  }, [zoom]);
 
   return (
     <>
@@ -203,6 +212,8 @@ const QrReader: React.FC = () => {
         />
         <canvas id="canvas" className="overlay-canvas"></canvas>
       </div>
+      <button onClick={() => setZoom((prev) => prev + 0.5)}>Zoom In</button>
+      <button onClick={() => setZoom((prev) => prev - 0.5)}>Zoom Out</button>
 
       <div style={!isCompleted ? {} : { color: "green" }}>
         {!isCompleted
@@ -210,39 +221,76 @@ const QrReader: React.FC = () => {
           : "✅ QRコードのスキャンが完了しました"}
       </div>
 
-      <div className="square-container">
-        <div className="square-partial-container">
-          {results.slice(0, 3).map((result, index) => (
-            <div
-              key={index}
-              className="square"
-              style={result === "" ? {} : { backgroundColor: "#4caf50" }}
-            ></div>
-          ))}
+      {isLightVehicle ? (
+        <div className="square-container">
+          <div className="square-partial-container">
+            {readResults.map((result, index) => (
+              <div
+                key={index}
+                className="square"
+                style={result === null ? {} : { backgroundColor: "#4caf50" }}
+              ></div>
+            ))}
+          </div>
         </div>
-        <div className="square-partial-container">
-          {results.slice(3, 5).map((result, index) => (
-            <div
-              key={index}
-              className="square"
-              style={result === "" ? {} : { backgroundColor: "#4caf50" }}
-            ></div>
-          ))}
+      ) : (
+        <div className="square-container">
+          <div className="square-partial-container">
+            {readResults.slice(0, 3).map((result, index) => (
+              <div
+                key={index}
+                className="square"
+                style={result === null ? {} : { backgroundColor: "#4caf50" }}
+              ></div>
+            ))}
+          </div>
+          <div className="square-partial-container">
+            {readResults.slice(3, 5).map((result, index) => (
+              <div
+                key={index}
+                className="square"
+                style={result === null ? {} : { backgroundColor: "#4caf50" }}
+              ></div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <div className="info-grid">
         <label>型式</label>
-        <div>{carType}</div>
+        <div>{vehicleDetails?.carType}</div>
 
         <label>ナンバー</label>
-        <div>{carNumber}</div>
+        <div>{vehicleDetails?.carNumber}</div>
 
         <label>車体番号</label>
-        <div>{serialNumber}</div>
+        <div>{vehicleDetails?.serialNumber}</div>
 
         <label>原動機の型式</label>
-        <div>{primeMoverType}</div>
+        <div>{vehicleDetails?.primeMoverType}</div>
       </div>
+
+      <div>ズーム倍率: {zoom}</div>
+      <div onClick={() => setShowSetting(!showSetting)}>
+        See Camera Settings
+      </div>
+      {showSetting && (
+        <textarea
+          style={{ width: "80%", height: "300px" }}
+          value={formatJson(setting)}
+          readOnly
+        />
+      )}
+
+      <div onClick={() => setShowCapabilities(!showCapabilities)}>
+        See Camera Capabilities
+      </div>
+      {showCapabilities && (
+        <textarea
+          style={{ width: "80%", height: "300px" }}
+          value={formatJson(capabilities)}
+          readOnly
+        />
+      )}
     </>
   );
 };
