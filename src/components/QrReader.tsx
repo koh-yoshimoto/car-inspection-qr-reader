@@ -269,28 +269,30 @@ const QrReader: React.FC = () => {
         <div>{vehicleDetails?.primeMoverType}</div>
       </div>
 
-      <div>ズーム倍率: {zoom}</div>
-      <div onClick={() => setShowSetting(!showSetting)}>
-        Confirm Camera Settings
-      </div>
-      {showSetting && (
-        <textarea
-          style={{ width: "80%", height: "300px" }}
-          value={formatJson(setting)}
-          readOnly
-        />
-      )}
+      <div style={{ marginTop: "100px" }}>
+        <div>ズーム倍率: {zoom}</div>
+        <div onClick={() => setShowSetting(!showSetting)}>
+          Confirm Camera Settings
+        </div>
+        {showSetting && (
+          <textarea
+            style={{ width: "80%", height: "300px" }}
+            value={formatJson(setting)}
+            readOnly
+          />
+        )}
 
-      <div onClick={() => setShowCapabilities(!showCapabilities)}>
-        Confirm Camera Capabilities
+        <div onClick={() => setShowCapabilities(!showCapabilities)}>
+          Confirm Camera Capabilities
+        </div>
+        {showCapabilities && (
+          <textarea
+            style={{ width: "80%", height: "300px" }}
+            value={formatJson(capabilities)}
+            readOnly
+          />
+        )}
       </div>
-      {showCapabilities && (
-        <textarea
-          style={{ width: "80%", height: "300px" }}
-          value={formatJson(capabilities)}
-          readOnly
-        />
-      )}
     </>
   );
 };
