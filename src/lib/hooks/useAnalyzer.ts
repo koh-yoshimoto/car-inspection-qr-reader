@@ -18,25 +18,28 @@ const useAnalyzer = () => {
   );
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
-  const addReadResult = useCallback(
-    (readResult: ReadResult): void => {
-      if (!readResult.isValid) {
-        console.log("not valid QR code");
-        return;
-      }
+	const addReadResult = useCallback(
+  (readResult: ReadResult): void => {
+    if (!readResult.isValid) {
+      console.log("not valid QR code");
+      return;
+    }
 
+    setIsLightVehicle((prevIsLightVehicle) => {
       const newIsLightVehicle = isLightVehicleResult(readResult);
+      const isTypeChanged = prevIsLightVehicle !== newIsLightVehicle;
 
       setReadResults((prevResults) => {
+
         // 軽自動車と普通車の切り替え時には前の結果をリセットするため
-        if (isLightVehicle != newIsLightVehicle) {
+        if (isTypeChanged) {
           prevResults = newIsLightVehicle
             ? new Array(2).fill(null)
             : new Array(5).fill(null);
         }
 
         let index = -1;
-        if (isLightVehicle) {
+        if (newIsLightVehicle) {
           index = detectIndexForLightVehicle(readResult);
         } else {
           index = detectIndexForNormalVehicle(readResult);
@@ -51,12 +54,13 @@ const useAnalyzer = () => {
         return [...prevResults];
       });
 
-      if (newIsLightVehicle) {
-        setIsLightVehicle(true);
-      }
-    },
-    [isLightVehicle],
-  );
+      console.log("setIsLightVehicle: ", newIsLightVehicle);
+      return newIsLightVehicle;
+    });
+  },
+  []
+);
+
 
   const isLightVehicleResult = (readResult: ReadResult): boolean => {
     const splited = readResult.text.split("/");
@@ -136,10 +140,7 @@ const useAnalyzer = () => {
         primeMoverType: qr2?.split("/")[5]?.replace(/\s+/g, "") || "",
       });
 
-      console.log("carType: ", qr3?.split("/")[6]);
-      console.log("carNumber: ", qr2?.split("/")[2]?.replace(/\s+/g, ""));
-      console.log("serialNumber: ", qr2?.split("/")[4]?.replace(/\s+/g, ""));
-      console.log("primeMoverType: ", qr2?.split("/")[5]?.replace(/\s+/g, ""));
+      setIsCompleted(true);
     }
   }, [readResults, isLightVehicle]);
 
